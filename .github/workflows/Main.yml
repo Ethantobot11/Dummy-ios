@@ -1,7 +1,7 @@
 name: Compile Clean GameMaker 2024.14.2 iOS Framework
 
 on:
-  workflow_dispatch: # Manual activation trigger
+  workflow_dispatch: 
   push:
     branches: [ main ]
 
@@ -13,22 +13,34 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install GameMaker 2024.14.2 Runtime Natively
+      - name: Download and Extract Official GameMaker Mac Bundle
         run: |
-          # 1. Create target execution directories
-          mkdir -p "$HOME/GameMaker-Studio2/setting"
           mkdir -p "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
+          mkdir -p "$HOME/.GameMakerStudio2"
+          mkdir -p pkg_extract
+          mkdir -p app_extract
+
+          # 1. Pull the official stable Mac Installer directly from GameMaker's servers
+          echo "Downloading Official GameMaker Mac Package..."
+          curl -L "https://gamemaker.io/fr/download/mac/lts/GameMaker.pkg" -o GameMaker.pkg
           
-          # 2. Download the official Mac GMRT installer bundle directly from YoYo Games servers
-          # (Note: GameMaker runtimes use a standard CDN path based on version string)
-          echo "Downloading GameMaker Runtime 2024.14.2..."
-          curl -L "https://internal.yoyogames.com/downloads/gms2/runtimes/runtime-2024.14.2.144.zip" -o runtime.zip
+          # 2. Extract the payload layers out of the .pkg container headlessly
+          echo "Unpacking package binaries..."
+          pkgutil --expand-full GameMaker.pkg pkg_extract
           
-          # 3. Extract the contents cleanly into the internal application cache frame
-          unzip -q runtime.zip -d "$HOME/Library/Application Support/GameMaker/Cache/runtimes/runtime-2024.14.2.144"
-          rm runtime.zip
+          # 3. Locate the hidden internal Runtime files packaged inside the app core
+          # Modern Mac installers house their base runtimes right inside the App package contents
+          echo "Locating toolchain runtimes..."
+          cp -R pkg_extract/GameMaker.pkg/Payload/GameMaker.app "$HOME/GameMakerApp"
           
-          # 4. Generate a baseline headless authentication configuration profile
+          # 4. Map the internal runtime binaries directly to your local execution pipeline cache
+          # This copies the native 2024 Igor compiler tools out of the app bundle
+          cp -R "$HOME/GameMakerApp/Contents/MonoBundle/runtimes/"* "$HOME/Library/Application Support/GameMaker/Cache/runtimes/"
+
+          # Clean up temporary storage structures
+          rm -rf pkg_extract GameMaker.pkg
+
+          # 5. Build headless automation credentials block
           cat << 'EOF' > "$HOME/.GameMakerStudio2/Config.json"
           {
             "login": "${{ secrets.GAMEMAKER_USERNAME }}",
@@ -136,8 +148,8 @@ jobs:
           GM_USERNAME: ${{ secrets.GAMEMAKER_USERNAME }}
           GM_PASSWORD: ${{ secrets.GAMEMAKER_PASSWORD }}
         run: |
-          # Pass the freshly generated code file into the 2024 compiler toolchain explicitly
-          "$HOME/Library/Application Support/GameMaker/Cache/runtimes/runtime-2024.14.2.144/bin/igor/osx/x64/Igor" \
+          # Dynamically execute Igor directly out of the extracted system application runtime cache
+          "$HOME/Library/Application Support/GameMaker/Cache/runtimes/*/bin/igor/osx/x64/Igor" \
             -options="$HOME/.GameMakerStudio2/Config.json" \
             -project="YYFramework/YYFramework.yyp" \
             -config="Default" \
@@ -173,3 +185,4 @@ jobs:
         with:
           name: yoyo-core-runner-ipa
           path: ~/GameMaker-Studio2/iOS/Default/FromIDE/YoYo-Framework-2024-14-2.ipa
+          retention-days: 5

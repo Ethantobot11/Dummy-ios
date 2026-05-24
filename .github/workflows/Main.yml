@@ -13,17 +13,35 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up GameMaker 2024.14.2
-        uses: itsmeow/action-gamemaker@v1
-        with:
-          gamemaker-version: '2024.14.2'
+      - name: Install GameMaker 2024.14.2 Runtime Natively
+        run: |
+          # 1. Create target execution directories
+          mkdir -p "$HOME/GameMaker-Studio2/setting"
+          mkdir -p "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
+          
+          # 2. Download the official Mac GMRT installer bundle directly from YoYo Games servers
+          # (Note: GameMaker runtimes use a standard CDN path based on version string)
+          echo "Downloading GameMaker Runtime 2024.14.2..."
+          curl -L "https://internal.yoyogames.com/downloads/gms2/runtimes/runtime-2024.14.2.144.zip" -o runtime.zip
+          
+          # 3. Extract the contents cleanly into the internal application cache frame
+          unzip -q runtime.zip -d "$HOME/Library/Application Support/GameMaker/Cache/runtimes/runtime-2024.14.2.144"
+          rm runtime.zip
+          
+          # 4. Generate a baseline headless authentication configuration profile
+          cat << 'EOF' > "$HOME/.GameMakerStudio2/Config.json"
+          {
+            "login": "${{ secrets.GAMEMAKER_USERNAME }}",
+            "target": "ios"
+          }
+          EOF
 
       - name: Shell Generate Blank Project Structure (.yyp)
         run: |
           mkdir -p YYFramework/rooms/Room1
           mkdir -p YYFramework/options/ios
           
-          # 1. Generate core GameMaker Project JSON manifest
+          # Generate core GameMaker Project JSON manifest
           cat << 'EOF' > YYFramework/YYFramework.yyp
           {
             "resourceType": "GMProject",
@@ -55,7 +73,7 @@ jobs:
           }
           EOF
 
-          # 2. Generate required default Room entity config
+          # Generate required default Room entity config
           cat << 'EOF' > YYFramework/rooms/Room1/Room1.yy
           {
             "resourceType": "GMRoom",
@@ -100,7 +118,7 @@ jobs:
           }
           EOF
 
-          # 3. Generate baseline minimal iOS target compiler definitions
+          # Generate baseline minimal iOS target compiler definitions
           cat << 'EOF' > YYFramework/options/ios/options_ios.yy
           {
             "resourceType": "GMIOSOptions",
@@ -118,9 +136,9 @@ jobs:
           GM_USERNAME: ${{ secrets.GAMEMAKER_USERNAME }}
           GM_PASSWORD: ${{ secrets.GAMEMAKER_PASSWORD }}
         run: |
-          # Pass the freshly generated code file into the 2024 compiler toolchain
-          /Users/runner/Library/Application\ Support/GameMaker/Cache/runtimes/*/bin/igor/osx/x64/Igor \
-            -options="~/.GameMakerStudio2/Config.json" \
+          # Pass the freshly generated code file into the 2024 compiler toolchain explicitly
+          "$HOME/Library/Application Support/GameMaker/Cache/runtimes/runtime-2024.14.2.144/bin/igor/osx/x64/Igor" \
+            -options="$HOME/.GameMakerStudio2/Config.json" \
             -project="YYFramework/YYFramework.yyp" \
             -config="Default" \
             -- iOS Package

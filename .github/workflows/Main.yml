@@ -24,9 +24,6 @@ jobs:
           echo "Downloading Official GameMaker Mac Package..."
           curl -L "https://gamemaker.io/fr/download/mac/lts/GameMaker.pkg" -o GameMaker.pkg
           
-          # 2. Extract the payload layers out of the .pkg container headlessly
-          echo "Unpacking package binaries..."
-          pkgutil --expand-full GameMaker.pkg pkg_extract
           
           # 3. Locate the hidden internal Runtime files packaged inside the app core
           # Modern Mac installers house their base runtimes right inside the App package contents

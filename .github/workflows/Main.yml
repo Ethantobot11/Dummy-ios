@@ -1,205 +1,49 @@
-name: Compile Clean GameMaker 2024.14.2 iOS Framework
+name: Diagnose GameMaker Package Structure
 
 on:
   workflow_dispatch: 
-  push:
-    branches: [ main ]
 
 jobs:
-  build-framework-ipa:
+  diagnose-package:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Download, Install, and Auto-Locate GameMaker Runtime
+      - name: Download Official GameMaker Mac Package
         run: |
-          # 1. Clear out and establish standard destination runtime targets safely
-          rm -rf "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
-          rm -rf "$HOME/.GameMakerStudio2"
-          
-          mkdir -p "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
-          mkdir -p "$HOME/.GameMakerStudio2"
-
-          # 2. Pull the official stable Mac Installer directly from GameMaker's servers
           echo "Downloading Official GameMaker Mac Package..."
           curl -L "https://gamemaker.io/fr/download/mac/lts/GameMaker.pkg" -o GameMaker.pkg
+
+      - name: Inspect Package Manifest and Content Payload
+        run: |
+          mkdir -p pkg_expanded
+          mkdir -p payload_extracted
           
-          # 3. Use macOS native installer to deploy the package safely straight to the system root
-          echo "Installing GameMaker package natively to system root..."
+          echo "=== Expanding PKG Metadata ==="
+          pkgutil --expand GameMaker.pkg pkg_expanded
+          ls -la pkg_expanded
+          
+          # Find any payload files inside the expanded package structure
+          PAYLOAD_PATH=$(find pkg_expanded -name "Payload" | head -n 1)
+          
+          if [ -n "$PAYLOAD_PATH" ]; then
+            echo "=== Extracting Inner Payload Structural Tree ==="
+            cd payload_extracted
+            cat "../$PAYLOAD_PATH" | gzip -d 2>/dev/null | cpio -id --quiet 2>/dev/null || true
+            
+            echo "=== Listing Top-Level Extracted Content ==="
+            ls -R | head -n 100
+          else
+            echo "No standard direct payload file found in metadata expansion."
+          fi
+
+      - name: Run Native System Installation and Check Receipts
+        run: |
+          echo "=== Performing Root System Install ==="
           sudo installer -pkg GameMaker.pkg -target /
           
-          # 4. Global Search: Scan the entire /Applications directory for Igor
-          echo "Scanning /Applications for installed GameMaker execution utilities..."
-          IGOR_PATH=$(find /Applications -type f -name "Igor" 2>/dev/null | head -n 1)
+          echo "=== Checking Active Applications Directory ==="
+          ls -la /Applications | grep -i gamemaker || true
           
-          if [ -z "$IGOR_PATH" ]; then
-            echo "ERROR: Could not locate the Igor compiler binary anywhere inside /Applications!"
-            exit 1
-          fi
-          
-          echo "Success! Found compilation tool at: $IGOR_PATH"
-          
-          # Isolate the parent runtime core package folder path
-          RUNTIME_SRC_DIR=$(dirname "$IGOR_PATH" | sed 's|/bin/igor/osx/x64||' | sed 's|/bin||')
-          RUNTIME_NAME="runtime-2024.14.2"
-          
-          # Mirror the core build framework to the standard local pipeline cache location
-          mkdir -p "$HOME/Library/Application Support/GameMaker/Cache/runtimes/$RUNTIME_NAME/bin/igor/osx/x64"
-          cp "$IGOR_PATH" "$HOME/Library/Application Support/GameMaker/Cache/runtimes/$RUNTIME_NAME/bin/igor/osx/x64/Igor"
-          
-          # If the framework contains sidecar assets or template configs, copy them over as well
-          if [ -d "$RUNTIME_SRC_DIR/ios" ]; then
-            cp -R "$RUNTIME_SRC_DIR/ios" "$HOME/Library/Application Support/GameMaker/Cache/runtimes/$RUNTIME_NAME/"
-          fi
-
-          # Clean up installer package file
-          rm -f GameMaker.pkg
-
-          # 5. Build headless automation credentials block
-          cat << 'EOF' > "$HOME/.GameMakerStudio2/Config.json"
-          {
-            "login": "${{ secrets.GAMEMAKER_USERNAME }}",
-            "target": "ios"
-          }
-          EOF
-
-      - name: Shell Generate Blank Project Structure (.yyp)
-        run: |
-          mkdir -p YYFramework/rooms/Room1
-          mkdir -p YYFramework/options/ios
-          
-          # Generate core GameMaker Project JSON manifest
-          cat << 'EOF' > YYFramework/YYFramework.yyp
-          {
-            "resourceType": "GMProject",
-            "resourceVersion": "1.7",
-            "name": "YYFramework",
-            "AudioGroups": [],
-            "configs": {
-              "children": [],
-              "name": "Default"
-            },
-            "FolderOrder": [],
-            "folders": [
-              {"resourceType":"GMFolder","resourceVersion":"1.0","name":"Rooms","folderPath":"folders/Rooms.yy","order":1}
-            ],
-            "IncludedFiles": [],
-            "isEcma": false,
-            "LibraryEmitters": [],
-            "MetaData": {
-              "IDEVersion": "2024.14.2"
-            },
-            "resources": [
-              {"id":{"name":"Room1","path":"rooms/Room1/Room1.yy"}}
-            ],
-            "RoomOrderNodes": [
-              {"parentId":null,"path":"rooms/Room1/Room1.yy"}
-            ],
-            "TextureGroups": [],
-            "Views": []
-          }
-          EOF
-
-          # Generate required default Room entity config
-          cat << 'EOF' > YYFramework/rooms/Room1/Room1.yy
-          {
-            "resourceType": "GMRoom",
-            "resourceVersion": "1.0",
-            "name": "Room1",
-            "creationCodeFile": "",
-            "inheritCreationCode": false,
-            "instanceCreationOrder": [],
-            "layers": [
-              {
-                "resourceType": "GMRoomLayer",
-                "resourceVersion": "1.0",
-                "name": "Instances",
-                "gridX": 32,
-                "gridY": 32,
-                "hierarchyFrozen": false,
-                "inheritLayerDepth": false,
-                "inheritLayerSettings": false,
-                "inheritSubLayers": false,
-                "instances": [],
-                "layers": [],
-                "visible": true,
-                "depth": 0,
-                "userdefinedDepth": false
-              }
-            ],
-            "parent": {
-              "name": "Rooms",
-              "path": "folders/Rooms.yy"
-            },
-            "roomSettings": {
-              "Height": 768,
-              "Width": 1366,
-              "Persistent": false
-            },
-            "viewSettings": {
-              "clearDisplayBuffer": true,
-              "clearScreenBorder": false,
-              "inheritViewSettings": false,
-              "enableViews": false
-            }
-          }
-          EOF
-
-          # Generate baseline minimal iOS target compiler definitions
-          cat << 'EOF' > YYFramework/options/ios/options_ios.yy
-          {
-            "resourceType": "GMIOSOptions",
-            "resourceVersion": "1.6",
-            "name": "iOS",
-            "option_ios_bundle_name": "com.yoyo.framework",
-            "option_ios_display_name": "YoYo Framework Base",
-            "option_ios_output_dir": "~/GameMaker-Studio2/iOS",
-            "option_ios_version": "1.0.0"
-          }
-          EOF
-
-      - name: Compile YYP Structure to Native Xcode Solution
-        env:
-          GM_USERNAME: ${{ secrets.GAMEMAKER_USERNAME }}
-          GM_PASSWORD: ${{ secrets.GAMEMAKER_PASSWORD }}
-        run: |
-          # Execute Igor out of the established local runtime cache folder structure
-          "$HOME/Library/Application Support/GameMaker/Cache/runtimes/*/bin/igor/osx/x64/Igor" \
-            -options="$HOME/.GameMakerStudio2/Config.json" \
-            -project="YYFramework/YYFramework.yyp" \
-            -config="Default" \
-            -- iOS Package
-
-      - name: Build Code-Sign-Free Mobile Executable Binary
-        run: |
-          cd ~/GameMaker-Studio2/iOS/Default/FromIDE
-          
-          # Stripping target deployment provisioning profiles manually
-          xcodebuild clean build \
-            -project YYFramework.xcodeproj \
-            -scheme YYFramework \
-            -configuration Release \
-            -sdk iphoneos \
-            CODE_SIGNING_ALLOWED="NO" \
-            CODE_SIGNING_REQUIRED="NO" \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS="" \
-            OBJROOT=$PWD/build \
-            SYMROOT=$PWD/build
-
-      - name: Structural Payload Zip Generation (.ipa)
-        run: |
-          cd ~/GameMaker-Studio2/iOS/Default/FromIDE
-          
-          mkdir -p Payload
-          cp -r build/Release-iphoneos/YYFramework.app Payload/
-          zip -r YoYo-Framework-2024-14-2.ipa Payload
-
-      - name: Save Base IPA Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: yoyo-core-runner-ipa
-          path: ~/GameMaker-Studio2/iOS/Default/FromIDE/YoYo-Framework-2024-14-2.ipa
-          retention-days: 5
+          echo "=== Scanning for any folder matching GameMaker in Shared Spaces ==="
+          find /Users/Shared -maxdepth 3 -name "*GameMaker*" 2>/dev/null || true
+          find "$HOME" -maxdepth 3 -name "*GameMaker*" 2>/dev/null || true

@@ -15,29 +15,41 @@ jobs:
 
       - name: Download and Extract Official GameMaker Mac Bundle
         run: |
+          # 1. Clean up and establish standard target directories safely
+          rm -rf "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
+          rm -rf "$HOME/.GameMakerStudio2"
+          rm -rf pkg_extract payload_extract
+          
           mkdir -p "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
           mkdir -p "$HOME/.GameMakerStudio2"
           mkdir -p pkg_extract
-          mkdir -p app_extract
+          mkdir -p payload_extract
 
-          # 1. Pull the official stable Mac Installer directly from GameMaker's servers
+          # 2. Pull the official stable Mac Installer directly from GameMaker's servers
           echo "Downloading Official GameMaker Mac Package..."
           curl -L "https://gamemaker.io/fr/download/mac/lts/GameMaker.pkg" -o GameMaker.pkg
           
+          # 3. Unpack the distribution archive structure securely using xar
+          echo "Unpacking package distribution layers..."
+          xar -xf GameMaker.pkg -C pkg_extract
           
-          # 3. Locate the hidden internal Runtime files packaged inside the app core
-          # Modern Mac installers house their base runtimes right inside the App package contents
-          echo "Locating toolchain runtimes..."
-          cp -R pkg_extract/GameMaker.pkg/Payload/GameMaker.app "$HOME/GameMakerApp"
+          # 4. Extract the actual GameMaker app payload from the inner compression envelope
+          echo "Decompressing inner runtime application payload..."
+          cd payload_extract
+          cat ../pkg_extract/*.pkg/Payload | gzip -d | cpio -id --quiet
+          cd ..
           
-          # 4. Map the internal runtime binaries directly to your local execution pipeline cache
-          # This copies the native 2024 Igor compiler tools out of the app bundle
+          # 5. Move the app bundle out of the extraction cradle
+          mv payload_extract/GameMaker.app "$HOME/GameMakerApp"
+          
+          # 6. Map the embedded 2024 Igor compiler toolsets to your execution cache
+          echo "Mapping runtime binaries to compiler cache..."
           cp -R "$HOME/GameMakerApp/Contents/MonoBundle/runtimes/"* "$HOME/Library/Application Support/GameMaker/Cache/runtimes/"
 
-          # Clean up temporary storage structures
-          rm -rf pkg_extract GameMaker.pkg
+          # Wipe temporary local staging structures completely
+          rm -rf pkg_extract payload_extract GameMaker.pkg
 
-          # 5. Build headless automation credentials block
+          # 7. Build headless automation credentials block
           cat << 'EOF' > "$HOME/.GameMakerStudio2/Config.json"
           {
             "login": "${{ secrets.GAMEMAKER_USERNAME }}",
@@ -145,7 +157,7 @@ jobs:
           GM_USERNAME: ${{ secrets.GAMEMAKER_USERNAME }}
           GM_PASSWORD: ${{ secrets.GAMEMAKER_PASSWORD }}
         run: |
-          # Dynamically execute Igor directly out of the extracted system application runtime cache
+          # Dynamically execute Igor out of the newly unpacked application runtime layout folder
           "$HOME/Library/Application Support/GameMaker/Cache/runtimes/*/bin/igor/osx/x64/Igor" \
             -options="$HOME/.GameMakerStudio2/Config.json" \
             -project="YYFramework/YYFramework.yyp" \

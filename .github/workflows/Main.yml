@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-framework-ipa:
-    runs-runs-on: macos-latest
+    runs-on: macos-latest
 
     steps:
       - name: Checkout Repository

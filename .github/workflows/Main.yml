@@ -13,41 +13,36 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install IDE and Native Runtime Deployment
-        env:
-          GM_USERNAME: ${{ secrets.GAMEMAKER_USERNAME }}
-          GM_PASSWORD: ${{ secrets.GAMEMAKER_PASSWORD }}
+      - name: Install Runtime via Node Package Manager
         run: |
-          # 1. Clear out and establish destination paths cleanly
+          # 1. Setup localized clean pipeline paths
           rm -rf "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
           rm -rf "$HOME/.GameMakerStudio2"
           
           mkdir -p "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
           mkdir -p "$HOME/.GameMakerStudio2"
 
-          # 2. Download and deploy the base GameMaker LTS 2026 IDE framework
-          echo "Downloading Official GameMaker Mac Package..."
-          curl -L "https://gamemaker.io/fr/download/mac/lts/GameMaker.pkg" -o GameMaker.pkg
-          
-          echo "Installing IDE framework to system applications..."
-          sudo installer -pkg GameMaker.pkg -target /
-          rm -f GameMaker.pkg
+          # 2. Globally download the official verified compiler package from npm
+          echo "Fetching core compiler toolchain package..."
+          npm install -g @gamemaker/compiler@2024.14.2-144
 
-          # 3. Create headless automation credentials configuration block
+          # 3. Find the exact layout folder where npm stored the global modules
+          NPM_MODULE_DIR=$(npm root -g)/@gamemaker/compiler
+          
+          # 4. Extract and link the asset structures directly into the localized compile pipeline
+          echo "Configuring runtime platform map..."
+          cp -R "$NPM_MODULE_DIR/runtime" "$HOME/Library/Application Support/GameMaker/Cache/runtimes/runtime-2024.14.2.144"
+          
+          # Correct flags for native systems execution 
+          chmod +x "$HOME/Library/Application Support/GameMaker/Cache/runtimes/runtime-2024.14.2.144/bin/igor/osx/x64/Igor"
+
+          # 5. Build headless automation credentials configuration block
           cat << 'EOF' > "$HOME/.GameMakerStudio2/Config.json"
           {
             "login": "${{ secrets.GAMEMAKER_USERNAME }}",
             "target": "ios"
           }
           EOF
-
-          # 4. Use the installed IDE natively to download the matching runtime headlessly
-          echo "Logging into YoYo accounts and downloading secure runtime..."
-          "/Applications/GameMaker LTS 2026.app/Contents/MacOS/GameMaker" \
-            -username "$GM_USERNAME" \
-            -password "$GM_PASSWORD" \
-            -runtime "2024.14.2" \
-            -download_runtime
 
       - name: Shell Generate Blank Project Structure (.yyp)
         run: |
@@ -149,7 +144,7 @@ jobs:
           GM_USERNAME: ${{ secrets.GAMEMAKER_USERNAME }}
           GM_PASSWORD: ${{ secrets.GAMEMAKER_PASSWORD }}
         run: |
-          # Execute Igor out of the official verified runtime cache target folder
+          # Execute Igor out of the established local runtime folder structure
           "$HOME/Library/Application Support/GameMaker/Cache/runtimes/*/bin/igor/osx/x64/Igor" \
             -options="$HOME/.GameMakerStudio2/Config.json" \
             -project="YYFramework/YYFramework.yyp" \

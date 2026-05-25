@@ -18,26 +18,24 @@ jobs:
           # 1. Clean up and establish standard target directories safely
           rm -rf "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
           rm -rf "$HOME/.GameMakerStudio2"
-          rm -rf target_apps
           
           mkdir -p "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
           mkdir -p "$HOME/.GameMakerStudio2"
-          mkdir -p target_apps
 
           # 2. Pull the official stable Mac Installer directly from GameMaker's servers
           echo "Downloading Official GameMaker Mac Package..."
           curl -L "https://gamemaker.io/fr/download/mac/lts/GameMaker.pkg" -o GameMaker.pkg
           
-          # 3. Use macOS native installer to deploy the package safely into our local folder
-          echo "Installing GameMaker package natively..."
-          sudo installer -pkg GameMaker.pkg -target "$PWD/target_apps"
+          # 3. Use macOS native installer to deploy the package safely straight to the system root
+          echo "Installing GameMaker package natively to system root..."
+          sudo installer -pkg GameMaker.pkg -target /
           
-          # 4. Map the embedded 2024 Igor compiler toolsets straight out of the installed Applications folder
+          # 4. Map the embedded compiler toolsets straight out of the native root /Applications directory
           echo "Mapping runtime binaries to compiler cache..."
-          cp -R target_apps/Applications/GameMaker.app/Contents/MonoBundle/runtimes/* "$HOME/Library/Application Support/GameMaker/Cache/runtimes/"
+          cp -R /Applications/GameMaker.app/Contents/MonoBundle/runtimes/* "$HOME/Library/Application Support/GameMaker/Cache/runtimes/"
 
-          # Clean up installer files
-          rm -rf target_apps GameMaker.pkg
+          # Clean up installer file
+          rm -f GameMaker.pkg
 
           # 5. Build headless automation credentials block
           cat << 'EOF' > "$HOME/.GameMakerStudio2/Config.json"

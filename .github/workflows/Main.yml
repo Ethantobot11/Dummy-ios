@@ -13,37 +13,22 @@ jobs:
           echo "Downloading Official GameMaker Mac Package..."
           curl -L "https://gamemaker.io/fr/download/mac/lts/GameMaker.pkg" -o GameMaker.pkg
 
-      - name: Inspect Package Manifest and Content Payload
-        run: |
-          mkdir -p pkg_expanded
-          mkdir -p payload_extracted
-          
-          echo "=== Expanding PKG Metadata ==="
-          pkgutil --expand GameMaker.pkg pkg_expanded
-          ls -la pkg_expanded
-          
-          # Find any payload files inside the expanded package structure
-          PAYLOAD_PATH=$(find pkg_expanded -name "Payload" | head -n 1)
-          
-          if [ -n "$PAYLOAD_PATH" ]; then
-            echo "=== Extracting Inner Payload Structural Tree ==="
-            cd payload_extracted
-            cat "../$PAYLOAD_PATH" | gzip -d 2>/dev/null | cpio -id --quiet 2>/dev/null || true
-            
-            echo "=== Listing Top-Level Extracted Content ==="
-            ls -R | head -n 100
-          else
-            echo "No standard direct payload file found in metadata expansion."
-          fi
-
-      - name: Run Native System Installation and Check Receipts
+      - name: Run Native System Installation
         run: |
           echo "=== Performing Root System Install ==="
           sudo installer -pkg GameMaker.pkg -target /
+
+      - name: Complete System Map Scan
+        run: |
+          echo "=== Listing /Applications Contents ==="
+          ls -la /Applications
           
-          echo "=== Checking Active Applications Directory ==="
-          ls -la /Applications | grep -i gamemaker || true
+          echo "=== Searching for any App folder containing GameMaker ==="
+          find /Applications -maxdepth 2 -name "*GameMaker*"
           
-          echo "=== Scanning for any folder matching GameMaker in Shared Spaces ==="
-          find /Users/Shared -maxdepth 3 -name "*GameMaker*" 2>/dev/null || true
-          find "$HOME" -maxdepth 3 -name "*GameMaker*" 2>/dev/null || true
+          echo "=== Searching for Igor across the entire disk ==="
+          # This scans all likely installation paths to find where the binary landed
+          find /Applications /Users/Shared /Library -name "Igor" -type f 2>/dev/null || echo "Igor not found via standard search."
+          
+          echo "=== Searching for any GameMaker related build tools ==="
+          find /Applications -name "*Compiler*" -o -name "*Runner*" 2>/dev/null | head -n 50

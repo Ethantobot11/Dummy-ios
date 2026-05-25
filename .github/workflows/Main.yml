@@ -10,33 +10,36 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Base Framework Repository
         uses: actions/checkout@v4
+        with:
+          path: main-repo
 
-      - name: Install Runtime via Node Package Manager
+      - name: Checkout Standalone GameMaker Runtime Toolchain
+        uses: actions/checkout@v4
+        with:
+          repository: YoYoGames/GameMaker-Runtimes
+          ref: master  # Pulls the active toolchain manifest branch
+          path: gm-runtime
+
+      - name: Link and Configure Compiler Cache Maps
         run: |
           # 1. Setup localized clean pipeline paths
           rm -rf "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
           rm -rf "$HOME/.GameMakerStudio2"
           
-          mkdir -p "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
+          mkdir -p "$HOME/Library/Application Support/GameMaker/Cache/runtimes/runtime-2024.14.2"
           mkdir -p "$HOME/.GameMakerStudio2"
 
-          # 2. Globally download the official verified compiler package from npm
-          echo "Fetching core compiler toolchain package..."
-          npm install -g @gamemaker/compiler@2024.14.2-144
+          # 2. Map the cloned open-source repository directly into the GameMaker runtime directory
+          echo "Injecting runtime assets..."
+          cp -R gm-runtime/* "$HOME/Library/Application Support/GameMaker/Cache/runtimes/runtime-2024.14.2/"
 
-          # 3. Find the exact layout folder where npm stored the global modules
-          NPM_MODULE_DIR=$(npm root -g)/@gamemaker/compiler
-          
-          # 4. Extract and link the asset structures directly into the localized compile pipeline
-          echo "Configuring runtime platform map..."
-          cp -R "$NPM_MODULE_DIR/runtime" "$HOME/Library/Application Support/GameMaker/Cache/runtimes/runtime-2024.14.2.144"
-          
-          # Correct flags for native systems execution 
-          chmod +x "$HOME/Library/Application Support/GameMaker/Cache/runtimes/runtime-2024.14.2.144/bin/igor/osx/x64/Igor"
+          # 3. Correct system-level executable flags on the compiler binary 
+          echo "Configuring toolchain permissions..."
+          chmod +x "$HOME/Library/Application Support/GameMaker/Cache/runtimes/runtime-2024.14.2/bin/igor/osx/x64/Igor"
 
-          # 5. Build headless automation credentials configuration block
+          # 4. Build headless automation credentials configuration block
           cat << 'EOF' > "$HOME/.GameMakerStudio2/Config.json"
           {
             "login": "${{ secrets.GAMEMAKER_USERNAME }}",
@@ -46,6 +49,7 @@ jobs:
 
       - name: Shell Generate Blank Project Structure (.yyp)
         run: |
+          cd main-repo
           mkdir -p YYFramework/rooms/Room1
           mkdir -p YYFramework/options/ios
           
@@ -147,12 +151,13 @@ jobs:
           # Execute Igor out of the established local runtime folder structure
           "$HOME/Library/Application Support/GameMaker/Cache/runtimes/*/bin/igor/osx/x64/Igor" \
             -options="$HOME/.GameMakerStudio2/Config.json" \
-            -project="YYFramework/YYFramework.yyp" \
+            -project="main-repo/YYFramework/YYFramework.yyp" \
             -config="Default" \
             -- iOS Package
 
       - name: Build Code-Sign-Free Mobile Executable Binary
         run: |
+          # Step into the target output space created by Igor
           cd ~/GameMaker-Studio2/iOS/Default/FromIDE
           
           # Stripping target deployment provisioning profiles manually

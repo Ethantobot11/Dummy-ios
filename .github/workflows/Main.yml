@@ -7,15 +7,15 @@ on:
 
 jobs:
   build-framework-ipa:
-    runs-on: macos-latest
+    runs-runs-on: macos-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Download and Install Official GameMaker Mac Bundle
+      - name: Download, Install, and Auto-Locate GameMaker Runtime
         run: |
-          # 1. Clean up and establish standard target directories safely
+          # 1. Clear out and establish standard destination runtime targets safely
           rm -rf "$HOME/Library/Application Support/GameMaker/Cache/runtimes"
           rm -rf "$HOME/.GameMakerStudio2"
           
@@ -30,11 +30,24 @@ jobs:
           echo "Installing GameMaker package natively to system root..."
           sudo installer -pkg GameMaker.pkg -target /
           
-          # 4. Map the embedded compiler toolsets straight out of the native root /Applications directory
-          echo "Mapping runtime binaries to compiler cache..."
-          cp -R /Applications/GameMaker.app/Contents/MonoBundle/runtimes/* "$HOME/Library/Application Support/GameMaker/Cache/runtimes/"
+          # 4. AUTO-SEARCH: Find where Igor is hiding on the system and extract its parent runtime folder
+          echo "Scanning system for installed GameMaker runtimes..."
+          IGOR_PATH=$(find /Applications /Users/Shared -type f -name "Igor" -path "*/bin/igor/osx/x64/Igor" | head -n 1)
+          
+          if [ -z "$IGOR_PATH" ]; then
+            echo "ERROR: Could not locate the Igor compiler binary anywhere on the system!"
+            exit 1
+          fi
+          
+          # Trace backwards from the binary to find the root runtime directory (e.g., /runtime-2024.x.x.x)
+          RUNTIME_SRC_DIR=$(echo "$IGOR_PATH" | sed 's|/bin/igor/osx/x64/Igor||')
+          echo "Success! Found runtime environment at: $RUNTIME_SRC_DIR"
+          
+          # Copy the dynamically located runtime folder directly into our compilation cache
+          RUNTIME_NAME=$(basename "$RUNTIME_SRC_DIR")
+          cp -R "$RUNTIME_SRC_DIR" "$HOME/Library/Application Support/GameMaker/Cache/runtimes/$RUNTIME_NAME"
 
-          # Clean up installer file
+          # Clean up installer package file
           rm -f GameMaker.pkg
 
           # 5. Build headless automation credentials block
@@ -145,7 +158,7 @@ jobs:
           GM_USERNAME: ${{ secrets.GAMEMAKER_USERNAME }}
           GM_PASSWORD: ${{ secrets.GAMEMAKER_PASSWORD }}
         run: |
-          # Execute Igor out of the official local runtime cache target folder
+          # Execute Igor out of the dynamically established local runtime cache folder
           "$HOME/Library/Application Support/GameMaker/Cache/runtimes/*/bin/igor/osx/x64/Igor" \
             -options="$HOME/.GameMakerStudio2/Config.json" \
             -project="YYFramework/YYFramework.yyp" \

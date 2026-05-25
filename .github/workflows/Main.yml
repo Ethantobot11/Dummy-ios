@@ -30,12 +30,12 @@ jobs:
           echo "Installing GameMaker package natively to system root..."
           sudo installer -pkg GameMaker.pkg -target /
           
-          # 4. Native Application Search: Find Igor within the modern .app bundle layout
-          echo "Scanning system for installed GameMaker execution utilities..."
-          IGOR_PATH=$(find /Applications/GameMaker.app -type f -name "Igor" | head -n 1)
+          # 4. Global Search: Scan the entire /Applications directory for Igor
+          echo "Scanning /Applications for installed GameMaker execution utilities..."
+          IGOR_PATH=$(find /Applications -type f -name "Igor" 2>/dev/null | head -n 1)
           
           if [ -z "$IGOR_PATH" ]; then
-            echo "ERROR: Could not locate the Igor compiler binary inside the application bundle!"
+            echo "ERROR: Could not locate the Igor compiler binary anywhere inside /Applications!"
             exit 1
           fi
           
